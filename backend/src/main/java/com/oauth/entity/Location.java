@@ -7,30 +7,25 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "locations")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class Location {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String email;
+    @Column(nullable = false, unique = true)
+    private String locationName;
 
-    private String firstName;
-    private String lastName;
-    private String provider; // GOOGLE, MICROSOFT
-    private String providerId;
-    private String profilePicture;
-    
-    // New fields
-    @Column(name = "location_id")
-    private Long locationId; // User's location/hospital/clinic ID
-    
-    @Column(name = "expiry_date")
-    private LocalDateTime expiryDate; // Account expiry date
+    private String address;
+    private String city;
+    private String state;
+    private String country;
+    private String postalCode;
+    private String phoneNumber;
+    private String email;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

@@ -1,8 +1,10 @@
 package com.oauth.service;
 
 import com.oauth.dto.UserDTO;
+import com.oauth.entity.Location;
 import com.oauth.entity.OAuthToken;
 import com.oauth.entity.User;
+import com.oauth.repository.LocationRepository;
 import com.oauth.repository.OAuthTokenRepository;
 import com.oauth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +20,12 @@ public class UserService {
     @Autowired
     private OAuthTokenRepository oauthTokenRepository;
 
+    @Autowired
+    private LocationRepository locationRepository;
+
     public User findOrCreateUser(String email, String firstName, String lastName, 
-                                  String provider, String providerId, String profilePicture) {
+                                  String provider, String providerId, String profilePicture,
+                                  Long locationId, LocalDateTime expiryDate) {
         Optional<User> existingUser = userRepository.findByProviderAndProviderId(provider, providerId);
         
         if (existingUser.isPresent()) {
@@ -33,6 +39,8 @@ public class UserService {
         newUser.setProvider(provider);
         newUser.setProviderId(providerId);
         newUser.setProfilePicture(profilePicture);
+        newUser.setLocationId(locationId);
+        newUser.setExpiryDate(expiryDate);
         newUser.setCreatedAt(LocalDateTime.now());
         newUser.setUpdatedAt(LocalDateTime.now());
 
@@ -72,6 +80,25 @@ public class UserService {
         dto.setLastName(user.getLastName());
         dto.setProvider(user.getProvider());
         dto.setProfilePicture(user.getProfilePicture());
+        dto.setLocationId(user.getLocationId());
+        dto.setExpiryDate(user.getExpiryDate());
+        
+        // Fetch location name if locationId exists
+        if (user.getLocationId() != null) {
+            Optional<Location> location = locationRepository.findById(user.getLocationId());
+            if (location.isPresent()) {
+                dto.setLocationName(location.get().getLocationName());
+            }
+        }
+        
         return dto;
+    }
+
+    // Check if user account is expired
+    public boolean isUserExpired(User user) {
+        if (user.getExpiryDate() == null) {
+            return false; // No expiry date = never expires
+        }
+        return LocalDateTime.now().isAfter(user.getExpiryDate());
     }
 }
