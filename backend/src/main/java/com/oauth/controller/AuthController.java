@@ -1,11 +1,15 @@
 package com.oauth.controller;
 
 import com.oauth.dto.AuthResponse;
+import com.oauth.dto.LocationDTO;
 import com.oauth.dto.UserDTO;
+import com.oauth.entity.Location;
 import com.oauth.entity.User;
 import com.oauth.service.JwtTokenProvider;
+import com.oauth.service.LocationService;
 import com.oauth.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
@@ -15,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,20 +30,25 @@ public class AuthController {
     private UserService userService;
 
     @Autowired
+    private LocationService locationService;
+
+    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @GetMapping("/google/callback")
     public AuthResponse googleLogin(
             @AuthenticationPrincipal OAuth2User principal,
-            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient authorizedClient) {
-        return handleOAuth2Login(principal, authorizedClient, "GOOGLE");
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient authorizedClient,
+            @RequestParam(required = false) Long locationId) {
+        return handleOAuth2Login(principal, authorizedClient, "GOOGLE", locationId, null);
     }
 
     @GetMapping("/microsoft/callback")
     public AuthResponse microsoftLogin(
             @AuthenticationPrincipal OAuth2User principal,
-            @RegisteredOAuth2AuthorizedClient("azure") OAuth2AuthorizedClient authorizedClient) {
-        return handleOAuth2Login(principal, authorizedClient, "MICROSOFT");
+            @RegisteredOAuth2AuthorizedClient("azure") OAuth2AuthorizedClient authorizedClient,
+            @RequestParam(required = false) Long locationId) {
+        return handleOAuth2Login(principal, authorizedClient, "MICROSOFT", locationId, null);
     }
 
     @GetMapping("/me")
@@ -61,6 +70,14 @@ public class AuthController {
             return response;
         }
 
+        // Check if user account is expired
+        if (userService.isUserExpired(user)) {
+            AuthResponse response = new AuthResponse();
+            response.setSuccess(false);
+            response.setMessage("User account has expired");
+            return response;
+        }
+
         AuthResponse response = new AuthResponse();
         response.setUser(userService.convertToDTO(user));
         response.setSuccess(true);
@@ -76,7 +93,8 @@ public class AuthController {
         return response;
     }
 
-    private AuthResponse handleOAuth2Login(OAuth2User principal, OAuth2AuthorizedClient authorizedClient, String provider) {
+    private AuthResponse handleOAuth2Login(OAuth2User principal, OAuth2AuthorizedClient authorizedClient, 
+                                          String provider, Long locationId, LocalDateTime expiryDate) {
         String email = principal.getAttribute("email");
         String firstName = principal.getAttribute("given_name");
         String lastName = principal.getAttribute("family_name");
@@ -89,7 +107,15 @@ public class AuthController {
             lastName = principal.getAttribute("family_name") != null ? principal.getAttribute("family_name") : "";
         }
 
-        User user = userService.findOrCreateUser(email, firstName, lastName, provider, providerId, profilePicture);
+        User user = userService.findOrCreateUser(email, firstName, lastName, provider, providerId, profilePicture, locationId, expiryDate);
+
+        // Check if user is expired
+        if (userService.isUserExpired(user)) {
+            AuthResponse response = new AuthResponse();
+            response.setSuccess(false);
+            response.setMessage("User account has expired. Please contact administrator.");
+            return response;
+        }
 
         // Save OAuth token
         OAuth2AccessToken accessToken = authorizedClient.getAccessToken();
@@ -115,7 +141,6 @@ public class AuthController {
     }
 
     private Long extractUserIdFromPrincipal(OAuth2User principal) {
-        // Extract user ID from principal - implementation depends on your needs
         return 1L; // Placeholder
     }
 }
